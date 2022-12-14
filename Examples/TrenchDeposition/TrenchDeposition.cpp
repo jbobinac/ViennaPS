@@ -8,7 +8,7 @@
 
 int main(int argc, char *argv[]) {
   using NumericType = double;
-  constexpr int D = 2;
+  constexpr int D = 3;
 
   // Parse the parameters
   psProcessParameters<NumericType> params;
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
   psProcess<NumericType, D> process;
   process.setDomain(geometry);
   process.setProcessModel(model.getProcessModel());
-  process.setNumberOfRaysPerPoint(1000);
+  process.setNumberOfRaysPerPoint(100);
   process.setProcessDuration(params.processTime);
 
   auto mesh = psSmartPointer<lsMesh<NumericType>>::New();

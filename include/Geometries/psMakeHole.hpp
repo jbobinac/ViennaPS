@@ -118,7 +118,7 @@ public:
 
     NumericType topRadius = holeRadius;
     if (taperAngle) {
-      topRadius += std::tan(taperAngle * rayInternal::PI / 180.) * holeDepth;
+      holeRadius -= std::tan(taperAngle * rayInternal::PI / 180.) * holeDepth;
     }
 
     lsMakeGeometry<NumericType, D>(
@@ -131,12 +131,12 @@ public:
         mask, maskAdd, lsBooleanOperationEnum::RELATIVE_COMPLEMENT)
         .apply();
 
-    lsBooleanOperation<NumericType, D>(substrate, mask,
-                                       lsBooleanOperationEnum::UNION)
-        .apply();
+    // lsBooleanOperation<NumericType, D>(substrate, mask,
+    //                                    lsBooleanOperationEnum::UNION)
+    //     .apply();
 
     if (makeMask)
       domain->insertNextLevelSet(mask);
-    domain->insertNextLevelSet(substrate, false);
+    domain->insertNextLevelSet(substrate, true);
   }
 };

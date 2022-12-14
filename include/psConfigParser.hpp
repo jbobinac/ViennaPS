@@ -13,10 +13,10 @@ template <typename NumericType> struct psProcessParameters {
   NumericType yExtent = 1.;
   NumericType gridDelta = 0.02;
 
-  NumericType maskHeight = 0.2;
-  NumericType taperAngle = 0.;
+  NumericType maskHeight = 1.2;
+  NumericType taperAngle = 1.193;
 
-  NumericType holeRadius = 0.2;
+  NumericType holeRadius = 0.175;
   NumericType trenchWidth = 0.2;
   NumericType trenchHeight = 0.4;
   NumericType finWidth = 0.5;
@@ -32,10 +32,11 @@ template <typename NumericType> struct psProcessParameters {
 
   // SF6O2 parameters
   int P, y;
-  NumericType totalEtchantFlux = 4.5e16;
-  NumericType totalOxygenFlux = 1.e18;
-  NumericType totalIonFlux = 2e16;
-  NumericType A_O = 3.;
+  NumericType totalEtchantFlux = 5e18;
+  NumericType totalOxygenFlux = 3.e17;
+  NumericType totalIonFlux = 1e16;
+  NumericType A_O = 2.;
+  NumericType A_SiO = 0.3;
 
   // Plasma damage parameters
   NumericType meanFreePath = .1;
@@ -56,6 +57,7 @@ template <typename NumericType> struct psProcessParameters {
               << "\n\t totalEtchantFlux: " << totalEtchantFlux
               << "\n\t totalOxygenFlux: " << totalOxygenFlux
               << "\n\t totalIonFlux: " << totalIonFlux << "\n\t A_O: " << A_O
+              << "\n\t A_SiO: " << A_SiO
               << "\n\t meanFreePath: " << meanFreePath << std::endl;
   }
 };
@@ -162,6 +164,8 @@ private:
         params.totalIonFlux = value;
       } else if (key == "A_O") {
         params.A_O = value;
+      } else if (key == "A_SiO") {
+        params.A_SiO = value;
       } else if (key == "meanFreePath") {
         params.meanFreePath = value;
       }

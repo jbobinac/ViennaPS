@@ -126,33 +126,33 @@ public:
           std::array<NumericType, 3> node = {0., 0., 0.};
           mesh->insertNextNode(node);
         }
-        mesh->nodes[0][0] = -trenchWidth / 2.;
-        mesh->nodes[0][1] = -yExtent / 2.;
+        mesh->nodes[0][0] = -trenchWidth / 2. + offset;
+        mesh->nodes[0][1] = -yExtent / 2. - 0.2;
 
-        mesh->nodes[1][0] = trenchWidth / 2.;
-        mesh->nodes[1][1] = -yExtent / 2.;
+        mesh->nodes[1][0] = trenchWidth / 2. - offset;
+        mesh->nodes[1][1] = -yExtent / 2. - 0.2;
 
-        mesh->nodes[2][0] = trenchWidth / 2.;
-        mesh->nodes[2][1] = yExtent / 2.;
+        mesh->nodes[2][0] = trenchWidth / 2.  - offset;
+        mesh->nodes[2][1] = yExtent / 2. + 0.2;
 
-        mesh->nodes[3][0] = -trenchWidth / 2.;
-        mesh->nodes[3][1] = yExtent / 2.;
+        mesh->nodes[3][0] = -trenchWidth / 2. + offset;
+        mesh->nodes[3][1] = yExtent / 2. + 0.2;
 
-        mesh->nodes[4][0] = -trenchWidth / 2. - offset;
-        mesh->nodes[4][1] = -yExtent / 2.;
-        mesh->nodes[4][2] = trenchDepth;
+        mesh->nodes[4][0] = -trenchWidth / 2.;
+        mesh->nodes[4][1] = -yExtent / 2. - 0.2;
+        mesh->nodes[4][2] = trenchDepth + gridDelta;
 
-        mesh->nodes[5][0] = trenchWidth / 2. + offset;
-        mesh->nodes[5][1] = -yExtent / 2.;
-        mesh->nodes[5][2] = trenchDepth;
+        mesh->nodes[5][0] = trenchWidth / 2. ;
+        mesh->nodes[5][1] = -yExtent / 2. - 0.2;
+        mesh->nodes[5][2] = trenchDepth + gridDelta;
 
-        mesh->nodes[6][0] = trenchWidth / 2. + offset;
-        mesh->nodes[6][1] = yExtent / 2.;
-        mesh->nodes[6][2] = trenchDepth;
+        mesh->nodes[6][0] = trenchWidth / 2.;
+        mesh->nodes[6][1] = yExtent / 2. + 0.2;
+        mesh->nodes[6][2] = trenchDepth + gridDelta;
 
-        mesh->nodes[7][0] = -trenchWidth / 2. - offset;
-        mesh->nodes[7][1] = yExtent / 2.;
-        mesh->nodes[7][2] = trenchDepth;
+        mesh->nodes[7][0] = -trenchWidth / 2.;
+        mesh->nodes[7][1] = yExtent / 2. + 0.2;
+        mesh->nodes[7][2] = trenchDepth + gridDelta;
 
         mesh->insertNextTriangle(std::array<unsigned, 3>{0, 3, 1});
         mesh->insertNextTriangle(std::array<unsigned, 3>{1, 3, 2});
@@ -182,8 +182,8 @@ public:
       maxPoint[0] = trenchWidth / 2;
 
       if constexpr (D == 3) {
-        minPoint[1] = -yExtent / 2.;
-        maxPoint[1] = yExtent / 2.;
+        minPoint[1] = -yExtent / 2. - gridDelta;
+        maxPoint[1] = yExtent / 2. + gridDelta;
         minPoint[2] = 0.;
         maxPoint[2] = trenchDepth;
       } else {
@@ -194,11 +194,25 @@ public:
           cutout,
           lsSmartPointer<lsBox<NumericType, D>>::New(minPoint, maxPoint))
           .apply();
+      // std::cout<< minPoint[1] << "        " << maxPoint[1] << std::endl;
     }
+
+    //     {auto mesh = psSmartPointer<lsMesh<NumericType>>::New();
+    //     lsToSurfaceMesh<NumericType, D>(mask, mesh).apply();
+    //     lsVTKWriter<NumericType>(mesh, "maskBeforeCut.vtp").apply();}
+
+    // {auto mesh = psSmartPointer<lsMesh<NumericType>>::New();
+    //     lsToSurfaceMesh<NumericType, D>(cutout, mesh).apply();
+    //     lsVTKWriter<NumericType>(mesh, "cutout.vtp").apply();}
 
     lsBooleanOperation<NumericType, D>(
         mask, cutout, lsBooleanOperationEnum::RELATIVE_COMPLEMENT)
         .apply();
+
+    // {auto mesh = psSmartPointer<lsMesh<NumericType>>::New();
+    //         lsToSurfaceMesh<NumericType, D>(mask, mesh).apply();
+    //         lsVTKWriter<NumericType>(mesh, "maskAfterCut.vtp").apply();}
+
 
     lsBooleanOperation<NumericType, D>(substrate, mask,
                                        lsBooleanOperationEnum::UNION)

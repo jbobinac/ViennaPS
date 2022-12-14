@@ -15,9 +15,9 @@ template <typename NumericType, int D>
 class SF6O2SurfaceModel : public psSurfaceModel<NumericType> {
   using psSurfaceModel<NumericType>::Coverages;
 
-  NumericType totalIonFlux = 2.e16;
-  NumericType totalEtchantFlux = 4.5e18;
-  NumericType totalOxygenFlux = 1.e18;
+  NumericType totalIonFlux = 1.e16;
+  NumericType totalEtchantFlux = 5e18;
+  NumericType totalOxygenFlux = 3.e17;
   static constexpr NumericType inv_rho_Si =
       2.0e-23; // in (atoms/cm³)⁻¹ (rho Si)
   static constexpr NumericType inv_rho_SiO2 = 1. / (2.6e22);
@@ -125,10 +125,10 @@ public:
   T getScalarVelocity(const std::array<T, 3> & /*coordinate*/, int material,
                       const std::array<T, 3> & /*normalVector*/,
                       unsigned long pointID) override {
-    if (material != maskMaterial)
+//    if (material != maskMaterial)
       return velocities->at(pointID);
-    else
-      return 0.;
+    // else
+    //   return 0.;
   }
 
   void setVelocities(psSmartPointer<std::vector<T>> passedVelocities) override {
@@ -143,8 +143,8 @@ private:
 template <typename NumericType, int D>
 class SF6O2Ion : public rayParticle<SF6O2Ion<NumericType, D>, NumericType> {
 public:
-  SF6O2Ion(NumericType passedEnergy = 100., NumericType oxySputterYield = 3)
-      : minIonEnergy(passedEnergy), A_O(oxySputterYield) {}
+  SF6O2Ion(NumericType passedEnergy = 100., NumericType oxySputterYield = 3, NumericType oxideEtchYield = 0.3)
+      : minIonEnergy(passedEnergy), A_O(oxySputterYield), A_SiO2(oxideEtchYield) {}
 
   void surfaceCollision(NumericType rayWeight,
                         const rayTriple<NumericType> &rayDir,
@@ -275,7 +275,7 @@ private:
   static constexpr NumericType A_p = 0.0337;
   static constexpr NumericType A_Si = 7.;
   const NumericType A_O = 3;
-  static constexpr NumericType A_SiO2 = 0.3;
+  const NumericType A_SiO2 = 0.3;
 
   static constexpr NumericType Eth_p = 0.;
   static constexpr NumericType Eth_Si = 15.;
@@ -411,12 +411,13 @@ public:
   SF6O2Etching(const double ionFlux, const double etchantFlux,
                const double oxygenFlux, const NumericType ionEnergy = 100.,
                const NumericType oxySputterYield = 3,
+               const NumericType oxideEtchYield = 0.3,
                const int maskMaterial = 0) {
     processModel = psSmartPointer<psProcessModel<NumericType, D>>::New();
 
     // particles
     auto ion =
-        std::make_unique<SF6O2Ion<NumericType, D>>(ionEnergy, oxySputterYield);
+        std::make_unique<SF6O2Ion<NumericType, D>>(ionEnergy, oxySputterYield, oxideEtchYield);
     auto etchant = std::make_unique<SF6O2Etchant<NumericType, D>>();
     auto oxygen = std::make_unique<SF6O2Oxygen<NumericType, D>>();
 
