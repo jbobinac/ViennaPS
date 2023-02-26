@@ -38,6 +38,9 @@ template <typename NumericType> struct psProcessParameters {
   NumericType A_O = 2.;
   NumericType A_SiO = 0.3;
 
+  // SiO2 Plasma etching params
+  NumericType totalPolymerFlux = 1.e17;
+
   // Plasma damage parameters
   NumericType meanFreePath = .1;
 
@@ -56,6 +59,7 @@ template <typename NumericType> struct psProcessParameters {
               << "\n\t sourcePower: " << sourcePower
               << "\n\t totalEtchantFlux: " << totalEtchantFlux
               << "\n\t totalOxygenFlux: " << totalOxygenFlux
+              << "\n\t totalPolymerFlux: " << totalPolymerFlux
               << "\n\t totalIonFlux: " << totalIonFlux << "\n\t A_O: " << A_O
               << "\n\t A_SiO: " << A_SiO
               << "\n\t meanFreePath: " << meanFreePath << std::endl;
@@ -162,6 +166,8 @@ private:
         params.totalOxygenFlux = value;
       } else if (key == "totalIonFlux") {
         params.totalIonFlux = value;
+      } else if (key == "totalPolymerFlux") {
+        params.totalPolymerFlux = value;
       } else if (key == "A_O") {
         params.A_O = value;
       } else if (key == "A_SiO") {

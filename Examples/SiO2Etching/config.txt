@@ -1,0 +1,11 @@
+# Config file for a hole etching example process
+xExtent=1
+yExtent=1
+gridDelta=0.02
+holeRadius=0.2
+maskHeight=0.05
+taperAngle=0
+processTime=4
+totalEtchantFlux=8e+16
+totalPolymerFlux=5e+17
+totalIonFlux=3e+16
