@@ -15,7 +15,7 @@
 template <typename NumericType, int D>
 class SiO2SurfaceModel : public psSurfaceModel<NumericType> {
   using psSurfaceModel<NumericType>::Coverages;
-  using psSurfaceModel<NumericType>::domain;
+  //using psSurfaceModel<NumericType>::domain;
 
   NumericType totalIonFlux = 1e16;
   NumericType totalEtchantFlux = 2.5e17;
@@ -25,6 +25,12 @@ class SiO2SurfaceModel : public psSurfaceModel<NumericType> {
   static constexpr NumericType inv_rho_SiO2 = 1. / (2.6e22);
   static constexpr double k_ev = 2.;
   static constexpr double k_ei = 2.;
+
+    // Temperature
+  static constexpr NumericType T = 300; // K
+  static constexpr NumericType E_SiO2 = 0.168;
+  static constexpr NumericType K_SiO2 = 0.0027;
+  static constexpr NumericType kB = 0.000086173324; // m2 kg s-2 K-1
 
 public:
   SiO2SurfaceModel(const double ionFlux, const double etchantFlux,
@@ -62,7 +68,9 @@ public:
     const auto dielectricEtchantRate =
         Rates->getScalarData("dielectricEtchantRate");
     const auto polymerEtchantRate = Rates->getScalarData("polymerEtchantRate");
-    const auto evaporationRate = Rates->getScalarData("evaporationRate");
+    //const auto evaporationRate = Rates->getScalarData("evaporationRate");
+        auto eToEvFluxConst = K_SiO2 * std::exp(- E_SiO2 / kB * T);
+
 
     const auto activeSitesPolymerCov =
         Coverages->getScalarData("activeSitesPolymerCov");
@@ -84,7 +92,7 @@ public:
             if(materialIds[i] >= 1){
               surfaceRates[i] = - inv_rho_SiO2 * 1e4 * (ionEnhancedEtchantRate->at(i) * totalIonFlux * etchantCoverage->at(i) +
                           ionSputteringRate->at(i) * totalIonFlux * (1. - etchantCoverage->at(i)) +
-                          evaporationRate->at(i) * totalEtchantFlux * etchantCoverage->at(i));; 
+                           eToEvFluxConst * dielectricEtchantRate->at(i) * totalEtchantFlux * etchantCoverage->at(i));; 
             }
             else
               surfaceRates[i] = 0.;
@@ -104,7 +112,9 @@ public:
     const auto polymerRate = Rates->getScalarData("polymerRate");
     const auto dielectricEtchantRate = Rates->getScalarData("dielectricEtchantRate");
     const auto polymerEtchantRate = Rates->getScalarData("polymerEtchantRate");
-    const auto evaporationRate = Rates->getScalarData("evaporationRate");
+    //const auto evaporationRate = Rates->getScalarData("evaporationRate");
+    // Get the coefficient to convert etchant flux to evaporation flux
+    auto eToEvFluxConst = K_SiO2 * std::exp(- E_SiO2 / kB * T);
 
     // Active sites on polymer coverage e,P
     auto activeSitesPolymerCov = Coverages->getScalarData("activeSitesPolymerCov");
@@ -132,7 +142,7 @@ public:
         etchantCoverage->at(i) = (dielectricEtchantRate->at(i) * totalEtchantFlux == 0)?0:
                                   dielectricEtchantRate->at(i) * totalEtchantFlux * (1.- polymerCoverage->at(i)) / 
                                   (dielectricEtchantRate->at(i) * totalEtchantFlux + k_ei * ionEnhancedEtchantRate->at(i) * totalIonFlux
-                                  + k_ev * evaporationRate->at(i) * totalEtchantFlux);
+                                  + k_ev * eToEvFluxConst * dielectricEtchantRate->at(i) * totalEtchantFlux);
       } else {
         etchantCoverage->at(i) = 0.;
       }
@@ -224,9 +234,57 @@ public:
                     const unsigned int primId, const int materialId,
                     const rayTracingData<NumericType> *globalData,
                     rayRNG &Rng) override final {
-    return std::pair<NumericType, rayTriple<NumericType>>{
-        1., rayTriple<NumericType>{0., 0., 0.}};
+    auto cosTheta = -rayInternal::DotProduct(rayDir, geomNormal);
+
+    assert(cosTheta >= 0 && "Hit backside of disc");
+    assert(cosTheta <= 1 + 1e-6 && "Error in calculating cos theta");
+
+    const NumericType incAngle =
+        std::acos(std::max(std::min(cosTheta, 1.), 0.));
+
+    NumericType Eref_peak = 0;
+
+    // Small incident angles are reflected with the energy fraction centered at
+    // 0
+    if (incAngle >= inflectAngle) {
+      Eref_peak =
+          Eref_max *
+          (1 - (1 - A) * std::pow((rayInternal::PI / 2 - incAngle) /
+                                      (rayInternal::PI / 2 - inflectAngle),
+                                  n_r));
+    } else {
+      Eref_peak = Eref_max * A * std::pow(incAngle / inflectAngle, n_l);
+    }
+    // Gaussian distribution around the Eref_peak scaled by the particle energy
+    NumericType tempEnergy = Eref_peak * E;
+
+    NumericType NewEnergy;
+
+    std::uniform_real_distribution<NumericType> uniDist;
+
+    do {
+      const auto rand1 = uniDist(Rng);
+      const auto rand2 = uniDist(Rng);
+      NewEnergy = tempEnergy +
+                  (std::min((E - tempEnergy), tempEnergy) + E * 0.05) *
+                      (1 - 2. * rand1) * std::sqrt(std::fabs(std::log(rand2)));
+
+    } while (NewEnergy > E || NewEnergy < 0.);
+
+    // Set the flag to stop tracing if the energy is below the threshold
+    if (NewEnergy > 1) {
+      E = NewEnergy;
+      auto direction = rayReflectionConedCosine<NumericType, D>(
+          rayInternal::PI / 2. - std::min(incAngle, minAngle), rayDir,
+          geomNormal, Rng);
+      return std::pair<NumericType, rayTriple<NumericType>>{NumericType(0),
+                                                            direction};
+    } else {
+      return std::pair<NumericType, rayTriple<NumericType>>{
+          1., rayTriple<NumericType>{0., 0., 0.}};
+    }
   }
+
   void initNew(rayRNG &RNG) override final {
     std::uniform_real_distribution<NumericType> uniDist;
     do {
@@ -259,6 +317,9 @@ private:
   static constexpr NumericType inflectAngle = 1.55334;
   static constexpr NumericType n_l = 10.;
   static constexpr NumericType n_r = 1.;
+  static constexpr NumericType Eref_max = 1.;
+
+  static constexpr NumericType minAngle = 1.3962634;
 
   static constexpr NumericType A =
       1. / (1. + (n_l / n_r) * (rayInternal::PI / (2 * inflectAngle) - 1.));
@@ -281,7 +342,7 @@ public:
                         rayRNG &Rng) override final {
 
     // etchant Rate
-    if(materialId == 1){
+    if(materialId >= 1){
       // Neutrals coverages
       const auto &phi_ep = globalData->getVectorData(0)[primID];
       const auto &phi_e = globalData->getVectorData(2)[primID];
@@ -290,10 +351,10 @@ public:
       NumericType Se_e = gamma_ee * std::max(1. - phi_e, 0.);
       NumericType Se_p = gamma_ep * std::max(1. - phi_ep, 0.);
 
-      localData.getVectorData(0)[primID] += rayWeight * Se_e;
-      localData.getVectorData(1)[primID] += rayWeight * Se_p;
+      localData.getVectorData(0)[primID] += rayWeight * Se_e ;
+      localData.getVectorData(1)[primID] += rayWeight * Se_p ;
       // evaporation flux Jev evaporationFlux
-      localData.getVectorData(2)[primID] += rayWeight * K_SiO2 * std::exp(- E_SiO2 / kB * T);
+      //localData.getVectorData(2)[primID] =  K_SiO2 * std::exp(- E_SiO2 / kB * T);
       }
   }
   std::pair<NumericType, rayTriple<NumericType>>
@@ -302,9 +363,19 @@ public:
                     const unsigned int primID, const int materialId,
                     const rayTracingData<NumericType> *globalData,
                     rayRNG &Rng) override final {
+    // Neutrals coverages
+    const auto &phi_ep = globalData->getVectorData(0)[primID];
+    const auto &phi_e = globalData->getVectorData(2)[primID];
 
-    auto direction = rayReflectionSpecular<NumericType>(rayDir, geomNormal);
-    return std::pair<NumericType, rayTriple<NumericType>>{gamma_ee, direction};
+    auto direction = rayReflectionDiffuse<NumericType, D>(geomNormal, Rng);
+    NumericType weightToDrop = 0;
+    if(materialId == 1)
+      weightToDrop = gamma_ee * std::max(1. - phi_e, 0.);
+    if(materialId == 2)
+      weightToDrop = gamma_ep * std::max(1. - phi_ep, 0.);
+
+    //auto direction = rayReflectionSpecular<NumericType>(rayDir, geomNormal);
+    return std::pair<NumericType, rayTriple<NumericType>>{weightToDrop, direction};
   }
   void initNew(rayRNG &RNG) override final {}
   int getRequiredLocalDataSize() const override final { return 3; }
@@ -317,11 +388,6 @@ private:
   static constexpr NumericType gamma_ee = 0.9;
   static constexpr NumericType gamma_ep = 0.6;
 
-  static constexpr NumericType kB = 0.000086173324; // m2 kg s-2 K-1
-  // Temperature
-  static constexpr NumericType T = 300; // K
-  static constexpr NumericType E_SiO2 = 0.168;
-  static constexpr NumericType K_SiO2 = 0.0027;
 };
 
 template <typename NumericType, int D>
@@ -355,7 +421,17 @@ public:
                     rayRNG &Rng) override final {
 
     auto direction = rayReflectionSpecular<NumericType>(rayDir, geomNormal);
-    return std::pair<NumericType, rayTriple<NumericType>>{gamma_p, direction};
+
+    // Active sites on polymer coverage
+    const auto &phi_ep = globalData->getVectorData(0)[primID];
+    // Polymer surface coverage
+    const auto &phi_p = globalData->getVectorData(1)[primID];
+    // Etchant surface coverage
+    const auto &phi_e = globalData->getVectorData(2)[primID];
+
+    const auto S_p = std::max(gamma_p * (1.- phi_ep * phi_p - phi_e ),0.);
+
+    return std::pair<NumericType, rayTriple<NumericType>>{S_p, direction};
   }
   void initNew(rayRNG &RNG) override final {}
   int getRequiredLocalDataSize() const override final { return 1; }

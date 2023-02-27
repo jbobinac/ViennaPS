@@ -4,6 +4,7 @@
 #include <psProcess.hpp>
 #include <psToSurfaceMesh.hpp>
 #include <psVTKWriter.hpp>
+#include <lsWriteVisualizationMesh.hpp>
 
 #include "geometryFactory.hpp"
 
@@ -20,14 +21,21 @@ int main(int argc, char *argv[]) {
   }
   params.print();
   auto geometry = psSmartPointer<psDomain<NumericType, D>>::New();
-  psMakeHole<NumericType, D>(
-      geometry, params.gridDelta /* grid delta */, params.xExtent /*x extent*/,
-      params.yExtent /*y extent*/, params.holeRadius /*hole radius*/,
-      params.maskHeight /* mask height*/,
-      params.taperAngle /* tapering angle in degrees */, true /*create mask*/)
-      .apply();
+  
+  psMakeTrench<NumericType, D>(geometry, params.gridDelta, params.xExtent,
+                               params.yExtent, params.trenchWidth,
+                               params.trenchHeight, params.taperAngle).apply();
 
+  // psMakeHole<NumericType, D>(
+  //     geometry, params.gridDelta /* grid delta */, params.xExtent /*x extent*/,
+  //     params.yExtent /*y extent*/, params.holeRadius /*hole radius*/,
+  //     params.maskHeight /* mask height*/,
+  //     params.taperAngle /* tapering angle in degrees */, true /*create mask*/)
+  //     .apply();
 
+  // Add polymer layer
+  auto polymer = psSmartPointer<lsDomain<NumericType, D>>::New(geometry->getLevelSets()->back());
+  geometry->insertNextLevelSet(polymer, true);
 
   SiO2Etching<NumericType, D> model(params.totalIonFlux /*ion flux*/,
                                      params.totalEtchantFlux /*etchant flux*/,
@@ -48,12 +56,12 @@ int main(int argc, char *argv[]) {
   process.setDomain(geometry);
   process.setProcessModel(model.getProcessModel());
   process.setMaxCoverageInitIterations(10);
-  process.setNumberOfRaysPerPoint(50);
+  process.setNumberOfRaysPerPoint(200);
 
   auto mesh = psSmartPointer<lsMesh<NumericType>>::New();
   psToSurfaceMesh<NumericType, D>(geometry, mesh).apply();
   psVTKWriter<NumericType>(mesh, "initial.vtp").apply();
-  static constexpr int intermediateSteps = 2;
+  static constexpr int intermediateSteps = 1;
   for (size_t counter = 1; counter <= intermediateSteps; counter++) {
     std::cout << "Step: " << counter << "/" << intermediateSteps << std::endl;
     auto duration = params.processTime / intermediateSteps;
@@ -69,6 +77,14 @@ int main(int argc, char *argv[]) {
                   std::to_string(int(std::round(counter * duration))) + ".vtp")
         .apply();
   }
+
+   // This step takes longer than the geometric advection...
+    lsWriteVisualizationMesh<NumericType, D> volumeMesh;
+    for (const auto &ls : *geometry->getLevelSets()) {
+      volumeMesh.insertNextLevelSet(ls);
+    }
+    volumeMesh.setFileName("FinalGeometry");
+    volumeMesh.apply();
 
   return EXIT_SUCCESS;
 }
