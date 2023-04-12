@@ -20,9 +20,9 @@ int main(int argc, char *argv[]) {
   if (argc > 1) {
     p = std::stoi(argv[1]);
     y = std::stoi(argv[2]);
-    ionEnergy = std::stoi(argv[3]);
-    t = std::stoi(argv[4]);
-    mH = std::stoi(argv[5]);
+    // ionEnergy = std::stoi(argv[3]);
+    // t = std::stoi(argv[4]);
+    // mH = std::stoi(argv[5]);
     }
 
   // Generate the initial geometry. SF6O2 Compact model is currently only

@@ -12,6 +12,7 @@
 template <typename NumericType, int D>
 class SF6O2CompactGeomModel : public psGeometricModel<NumericType, D> {
   using psGeometricModel<NumericType, D>::domain;
+  std::string filename;
   NumericType pressure;
   NumericType chamberOxyPercentage;
   NumericType ionEnergy;
@@ -25,7 +26,7 @@ public:
                         const NumericType passedIonEnergy,
                         const NumericType passedMaskHeight,
                         const NumericType passedTime)
-      : pressure(passedPressure),
+      : filename(passedFilename), pressure(passedPressure),
         chamberOxyPercentage(passedChamberOxyPercentage),
         ionEnergy(passedIonEnergy), maskHeight(passedMaskHeight), t(passedTime) {}
 
@@ -37,8 +38,8 @@ public:
     static constexpr int DataDim = InputDim + TargetDim;
 
     auto dataSource =
-        psSmartPointer<psCSVDataSource<NumericType, DataDim>>::New();
-    dataSource->setFilename("dimensionsP&y35ptGrid.csv");
+        psSmartPointer<psCSVDataSource<NumericType, DataDim>>::New(filename);
+    //dataSource->setFilename("dimensionsP&y35ptGrid.csv");
 
     psRectilinearGridInterpolation<NumericType, InputDim, TargetDim>
         interpolation;

@@ -96,9 +96,12 @@ public:
 
     auto dat = data;
 
-    std::vector<NumericType> distances(triSize);
+#pragma omp parallel
+#pragma omp single
     for (int i = 0; i < D; ++i) {
+#pragma omp task untied
       {
+        std::vector<NumericType> distances(triSize);
 #pragma omp parallel for default(none) firstprivate(i, size)                   \
     shared(dat, distances) schedule(dynamic)
         for (int j = 1; j < size; ++j) {
@@ -116,6 +119,7 @@ public:
           scalingFactors[i] = 1.0;
       }
     }
+#pragma omp taskwait
   }
 };
 

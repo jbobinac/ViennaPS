@@ -107,26 +107,13 @@ public:
     //     }
     // #endif
 
-    if (!equalSize) {
-      std::cout << "Data is not arranged in a rectilinear grid!\n";
-      return false;
-    }
-
-    for (int i = 0; i < InputDim; ++i)
-      if (uniqueValues[i].empty()) {
-        std::cout << "The grid has no values along dimension " << i
-                  << std::endl;
-        return false;
-      }
-
     initialized = true;
     return true;
   }
 
   std::tuple<OutputType, bool> estimate(const InputType &input) override {
     if (!initialized)
-      if (!initialize())
-        return {{}, {}};
+      initialize();
 
     bool isInside = true;
     for (int i = 0; i < InputDim; ++i)
@@ -137,6 +124,8 @@ public:
           isInside = false;
         }
       } else {
+        std::cout << "The grid has no values along dimension " << i
+                  << std::endl;
         return {{}, {}};
       }
 
@@ -160,10 +149,10 @@ public:
         // greatest grid point.
 
         // The following function returns an iterator pointing to the first
-        // element that is greater than input[i].
+        // element that is greater than input[i]. If no such element is found, a
+        // past-the-end iterator is returned.
         auto upperIt = uniqueValues[i].upper_bound(input[i]);
 
-        // Get the index of the lower bound (upper bound index - 1)
         gridIndices[i] = std::distance(uniqueValues[i].begin(), upperIt) - 1;
 
         NumericType upperBound = *upperIt;
@@ -174,9 +163,8 @@ public:
     }
 
     // Now retrieve the values at the corners of the selected hyperrectangle
-    std::array<std::array<NumericType, OutputDim>, (1 << InputDim)>
-        cornerValues;
-    for (int i = 0; i < cornerValues.size(); ++i) {
+    std::array<std::array<NumericType, OutputDim>, (1 << InputDim)> corners;
+    for (int i = 0; i < corners.size(); ++i) {
       size_t index = 0;
       size_t stepsize = 1;
 
@@ -201,8 +189,7 @@ public:
         stepsize *= uniqueValues[j].size();
       }
       const auto &corner = data->at(index);
-      std::copy(corner.cbegin() + InputDim, corner.cend(),
-                cornerValues[i].begin());
+      std::copy(corner.cbegin() + InputDim, corner.cend(), corners[i].begin());
     }
 
     // Now do the actual linear interpolation
@@ -211,12 +198,12 @@ public:
       for (int i = InputDim - 1; i >= 0; --i) {
         int stride = 1 << i;
         for (int j = 0; j < stride; ++j) {
-          cornerValues[j][dim] =
-              normalizedCoordinates[i] * cornerValues[j][dim] +
-              (1 - normalizedCoordinates[i]) * cornerValues[j + stride][dim];
+          corners[j][dim] =
+              normalizedCoordinates[i] * corners[j][dim] +
+              (1 - normalizedCoordinates[i]) * corners[j + stride][dim];
         }
       }
-      result[dim] = cornerValues[0][dim];
+      result[dim] = corners[0][dim];
     }
 
     return {result, isInside};

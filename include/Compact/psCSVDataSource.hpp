@@ -10,8 +10,8 @@
 
 #include <psCSVReader.hpp>
 #include <psDataSource.hpp>
+#include <psParser.hpp>
 #include <psSmartPointer.hpp>
-#include <psUtils.hpp>
 
 template <typename NumericType, int D>
 class psCSVDataSource : public psDataSource<NumericType, D> {
@@ -24,10 +24,10 @@ class psCSVDataSource : public psDataSource<NumericType, D> {
   processPositionalParam(const std::string &input,
                          std::vector<NumericType> &positionalParameters) {
     // Positional parameter
-    auto v = psUtils::safeConvert<NumericType>(input);
-    if (v.has_value())
-      positionalParameters.push_back(v.value());
-    else {
+    try {
+      NumericType num = psInternal::parse<NumericType>(input);
+      positionalParameters.push_back(num);
+    } catch (const std::invalid_argument &) {
       std::cout << "Error while converting parameter '" << input
                 << "' to numeric type.\n";
     }
@@ -36,21 +36,20 @@ class psCSVDataSource : public psDataSource<NumericType, D> {
   static void processNamedParam(
       const std::string &input,
       std::unordered_map<std::string, NumericType> &namedParameters) {
-    const std::string keyValueRegex =
-        R"rgx(^[ \t]*([0-9a-zA-Z_-]+)[ \t]*=[ \t]*([0-9a-zA-Z_\-\.+]+)[ \t]*$)rgx";
-    const std::regex rgx(keyValueRegex);
+    const std::string regexPattern = "^[\\ \\t]*([0-9a-zA-Z\\_\\-]+)[\\ \\t]*=[\\ "
+                                     "\\t]*([0-9eE\\.\\-\\+]+)[\\ \\t]*$";
+    const std::regex rgx(regexPattern);
 
     std::smatch smatch;
     if (std::regex_search(input, smatch, rgx) && smatch.size() == 3) {
-      auto v = psUtils::safeConvert<NumericType>(smatch[2]);
-      if (v.has_value())
-        namedParameters.insert({smatch[1], v.value()});
-      else {
-        std::cout << "Error while converting value of parameter '" << smatch[1]
-                  << "'\n";
+      try {
+        NumericType value = psInternal::parse<NumericType>(smatch[2]);
+        namedParameters.insert({smatch[1], value});
+      } catch (const std::invalid_argument &) {
+        std::cout << "Error while parsing parameter '" << input << "'\n";
       }
     } else {
-      std::cout << "Error while parsing parameter line '" << input << "'\n";
+      std::cout << "Error while parsing parameter '" << input << "'\n";
     }
   }
 
@@ -74,20 +73,19 @@ class psCSVDataSource : public psDataSource<NumericType, D> {
     }
   }
 
-  void processHeader() {
-    auto header = reader.readHeader();
-    if (header.has_value()) {
-      std::istringstream cmt(header.value());
-      std::string line;
+  static void processComments(
+      const std::string &comments,
+      std::vector<NumericType> &positionalParameters,
+      std::unordered_map<std::string, NumericType> &namedParameters) {
+    std::istringstream cmt(comments);
+    std::string line;
 
-      // Go over each comment line
-      while (std::getline(cmt, line)) {
-        // Check if the line is marked as a parameter line
-        if (line.rfind("#!") == 0) {
-          processParamLine(line, positionalParameters, namedParameters);
-        }
+    // Go over each comment line
+    while (std::getline(cmt, line)) {
+      // Check if the line is marked as a parameter line
+      if (line.rfind("#!") == 0) {
+        processParamLine(line, positionalParameters, namedParameters);
       }
-      parametersInitialized = true;
     }
   }
 
@@ -107,17 +105,28 @@ public:
 
   void setOffset(int passedOffset) { reader.setOffset(passedOffset); }
 
-  DataPtr getAll() override { return reader.apply(); }
+  DataPtr getAll() override {
+    auto [data, comments] = reader.apply();
+    if (data) {
+      processComments(comments, positionalParameters, namedParameters);
+      parametersInitialized = true;
+    }
 
-  std::vector<NumericType> getPositionalParameters() override {
+    return data;
+  }
+
+  std::vector<NumericType> getPositionalParameters() const override {
     if (!parametersInitialized)
-      processHeader();
+      std::cout << "Parameters have not been initialized yet! Call `getAll()` "
+                   "first.\n";
     return positionalParameters;
   }
 
-  std::unordered_map<std::string, NumericType> getNamedParameters() override {
+  std::unordered_map<std::string, NumericType>
+  getNamedParameters() const override {
     if (!parametersInitialized)
-      processHeader();
+      std::cout << "Parameters have not been initialized yet! Call `getAll()` "
+                   "first.\n";
     return namedParameters;
   }
 };

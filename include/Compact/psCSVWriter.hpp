@@ -16,7 +16,6 @@ template <class NumericType, int NumCols> class psCSVWriter {
   std::string filename;
   std::ofstream file;
   std::string header;
-  bool initialized = false;
 
   template <class Iterator>
   static std::string join(Iterator begin, Iterator end,
@@ -34,13 +33,13 @@ public:
   psCSVWriter(std::string passedFilename, std::string passedHeader = "")
       : filename(passedFilename), header(passedHeader) {}
 
-  bool initialize() {
+  void initialize() {
     if (filename.empty()) {
       std::cout << "No filename provided!" << std::endl;
-      return false;
+      return;
     }
     if (file.is_open())
-      return false;
+      return;
     file.open(filename);
     if (file.is_open()) {
       if (!header.empty()) {
@@ -50,11 +49,7 @@ public:
           file << "# " << line << '\n';
         }
       }
-    } else {
-      return false;
     }
-    initialized = true;
-    return true;
   }
 
   void setFilename(std::string passedFilename) { filename = passedFilename; }
@@ -62,19 +57,11 @@ public:
   void setHeader(std::string passedHeader) { header = passedHeader; }
 
   void writeRow(const std::array<NumericType, NumCols> &data) {
-    if (!initialized)
-      if (!initialize())
-        return;
-
     if (file.is_open())
       file << join(data.cbegin(), data.cend()) << '\n';
   }
 
   void writeRow(const std::vector<NumericType> &data) {
-    if (!initialized)
-      if (!initialize())
-        return;
-
     if (data.size() != NumCols) {
       std::cout << "Unexpected number of items in the provided row!\n";
       return;
@@ -87,10 +74,6 @@ public:
   }
 
   void writeRow(std::initializer_list<NumericType> data) {
-    if (!initialized)
-      if (!initialize())
-        return;
-
     if (data.size() != NumCols) {
       std::cout << "Unexpected number of items in the provided row!\n";
       return;
