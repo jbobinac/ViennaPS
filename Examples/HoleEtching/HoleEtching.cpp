@@ -1,8 +1,10 @@
 #include <Geometries/psMakeHole.hpp>
 #include <SF6O2Etching.hpp>
-#include <psConfigParser.hpp>
 #include <psProcess.hpp>
 #include <psToSurfaceMesh.hpp>
+#include <psUtils.hpp>
+
+#include "Parameters.hpp"
 #include <psVTKWriter.hpp>
 
 #include "geometryFactory.hpp"
@@ -12,11 +14,16 @@ int main(int argc, char *argv[]) {
   constexpr int D = 3;
 
   // Parse the parameters
-  psProcessParameters<NumericType> params;
+  int P, y;
+
+  Parameters<NumericType> params;
   if (argc > 1) {
-    psConfigParser<NumericType> parser(argv[1]);
-    parser.apply();
-    params = parser.getParameters();
+    auto config = psUtils::readConfigFile(argv[1]);
+    if (config.empty()) {
+      std::cerr << "Empty config provided" << std::endl;
+      return -1;
+    }
+    params.fromMap(config);
   }
   params.print();
   auto geometry = psSmartPointer<psDomain<NumericType, D>>::New();
@@ -24,7 +31,8 @@ int main(int argc, char *argv[]) {
       geometry, params.gridDelta /* grid delta */, params.xExtent /*x extent*/,
       params.yExtent /*y extent*/, params.holeRadius /*hole radius*/,
       params.maskHeight /* mask height*/,
-      params.taperAngle /* tapering angle in degrees */, true /*create mask*/)
+      params.taperAngle /* tapering angle in degrees */, 0 /* base height */,
+      false /* periodic boundary */, true /*create mask*/)
       .apply();
 
 

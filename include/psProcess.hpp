@@ -47,9 +47,35 @@ public:
 
   void setMaxCoverageInitIterations(size_t maxIt) { maxIterations = maxIt; }
 
+  void
+  setIntegrationScheme(const lsIntegrationSchemeEnum passedIntegrationScheme) {
+    integrationScheme = passedIntegrationScheme;
+  }
+
+  void setPrintIntdermediate(const bool passedPrint) {
+    printIntermediate = passedPrint;
+  }
+
   void apply() {
     /* ---------- Process Setup --------- */
     auto name = model->getProcessName();
+
+    if (!domain) {
+      lsMessage::getInstance()
+          .addWarning("No domain passed to psProcess.")
+          .print();
+      return;
+    }
+
+    if (model->getGeometricModel()) {
+      model->getGeometricModel()->setDomain(domain);
+#ifdef VIENNAPS_VERBOSE
+      std::cout << "Applying geometric model..." << std::endl;
+#endif
+      model->getGeometricModel()->apply();
+      return;
+    }
+
     if (processDuration == 0.) {
       // apply only volume model
       if (model->getVolumeModel()) {
@@ -86,6 +112,7 @@ public:
 
     lsAdvect<NumericType, D> advectionKernel;
     advectionKernel.setVelocityField(transField);
+    advectionKernel.setIntegrationScheme(integrationScheme);
 
     for (auto dom : *domain->getLevelSets()) {
       meshConverter.insertNextLevelSet(dom);
@@ -119,8 +146,7 @@ public:
     }
 
     // Determine whether there are process parameters used in ray tracing
-    if (model->getSurfaceModel())
-      model->getSurfaceModel()->initializeProcessParameters();
+    model->getSurfaceModel()->initializeProcessParameters();
     const bool useProcessParams =
         model->getSurfaceModel()->getProcessParameters() != nullptr;
 
@@ -197,26 +223,27 @@ public:
                                  rayTraceCoverages);
           model->getSurfaceModel()->updateCoverages(Rates);
           coveragesInitialized = true;
-// #ifdef VIENNAPS_VERBOSE
-//           auto coverages = model->getSurfaceModel()->getCoverages();
-//           for (size_t idx = 0; idx < coverages->getScalarDataSize(); idx++) {
-//             auto label = coverages->getScalarDataLabel(idx);
-//             diskMesh->getCellData().insertNextScalarData(
-//                 *coverages->getScalarData(idx), label);
-//           }
-//           for (size_t idx = 0; idx < Rates->getScalarDataSize(); idx++) {
-//             auto label = Rates->getScalarDataLabel(idx);
-//             diskMesh->getCellData().insertNextScalarData(
-//                 *Rates->getScalarData(idx), label);
-//           }
-//           printDiskMesh(diskMesh, name + "_covIinit_" +
-//                                       std::to_string(iterations) + ".vtp");
-//           std::cerr << "\r"
-//                     << "Iteration: " << iterations + 1 << " / "
-//                     << maxIterations;
-//           if (iterations == maxIterations - 1)
-//             std::cerr << std::endl;
-// #endif
+#ifdef VIENNAPS_VERBOSE
+          auto coverages = model->getSurfaceModel()->getCoverages();
+          for (size_t idx = 0; idx < coverages->getScalarDataSize(); idx++) {
+            auto label = coverages->getScalarDataLabel(idx);
+            diskMesh->getCellData().insertNextScalarData(
+                *coverages->getScalarData(idx), label);
+          }
+          for (size_t idx = 0; idx < Rates->getScalarDataSize(); idx++) {
+            auto label = Rates->getScalarDataLabel(idx);
+            diskMesh->getCellData().insertNextScalarData(
+                *Rates->getScalarData(idx), label);
+          }
+          if (printIntermediate)
+            printDiskMesh(diskMesh, name + "_covIinit_" +
+                                        std::to_string(iterations) + ".vtp");
+          std::cerr << "\r"
+                    << "Iteration: " << iterations + 1 << " / "
+                    << maxIterations;
+          if (iterations == maxIterations - 1)
+            std::cerr << std::endl;
+#endif
         }
       }
     }
@@ -285,7 +312,9 @@ public:
       model->getVelocityField()->setVelocities(velocitites);
 
 #ifdef VIENNAPS_VERBOSE
-      diskMesh->getCellData().insertNextScalarData(*velocitites, "velocities");
+      if (velocitites)
+        diskMesh->getCellData().insertNextScalarData(*velocitites,
+                                                     "velocities");
       if (useCoverages) {
         auto coverages = model->getSurfaceModel()->getCoverages();
         for (size_t idx = 0; idx < coverages->getScalarDataSize(); idx++) {
@@ -299,7 +328,9 @@ public:
         diskMesh->getCellData().insertNextScalarData(*Rates->getScalarData(idx),
                                                      label);
       }
-      printDiskMesh(diskMesh, name + "_" + std::to_string(counter++) + ".vtp");
+      if (printIntermediate)
+        printDiskMesh(diskMesh,
+                      name + "_" + std::to_string(counter++) + ".vtp");
 #endif
       // apply volume model
       if (useVolumeModel) {
@@ -443,10 +474,13 @@ private:
   NumericType processDuration;
   rayTraceDirection sourceDirection =
       D == 3 ? rayTraceDirection::POS_Z : rayTraceDirection::POS_Y;
+  lsIntegrationSchemeEnum integrationScheme =
+      lsIntegrationSchemeEnum::ENGQUIST_OSHER_1ST_ORDER;
   long raysPerPoint = 1000;
   bool useRandomSeeds = true;
   size_t maxIterations = 20;
   bool coveragesInitialized = false;
+  bool printIntermediate = true;
 };
 
 #endif
