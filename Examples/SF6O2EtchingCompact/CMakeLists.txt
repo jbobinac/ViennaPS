@@ -6,10 +6,11 @@ add_executable(${PROJECT_NAME} ${PROJECT_NAME}.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC ${VIENNAPS_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${VIENNAPS_LIBRARIES})
 
+configure_file(parameters.hpp.in parameters.hpp)
 set(dimension_extraction "DimensionExtraction")
 add_executable(${dimension_extraction} ${dimension_extraction}.cpp)
 target_include_directories(${dimension_extraction} PRIVATE ${CMAKE_BINARY_DIR})
-target_include_directories(${dimension_extraction} PUBLIC ${VIENNAPS_INCLUDE_DIRS})
+target_include_directories(${dimension_extraction} PUBLIC ${VIENNAPS_INCLUDE_DIRS} ${CMAKE_BINARY_DIR})
 target_link_libraries(${dimension_extraction} ${VIENNAPS_LIBRARIES})
 
 add_dependencies(buildExamples ${PROJECT_NAME})

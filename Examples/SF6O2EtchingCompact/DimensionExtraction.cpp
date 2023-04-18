@@ -16,7 +16,7 @@
 #include "CSVWriter.hpp"
 #include "FilenameUtils.hpp"
 // Auto-generated header which includes data directory path
-#include "parameters.hpp"
+#include "/home/bobinac/Documents/ViennaTools/ViennaPS/build/Examples/SF6O2EtchingCompact/parameters.hpp"
 
 #include <queue>
 #include <deque>
@@ -55,7 +55,7 @@ int main(int argc, const char *argv[]) {
   const std::string filenameRegex =
     "\\bHoleEtch_p_([0-9]+)_[O|y]_([0-9]+)_100\\.vtp\\b";
 
-  std::string dataDir = "/home/bobinac/Documents/ViennaTools/ViennaPS/build2/Examples/HoleEtching/CM_P&yValidation"; //params::defaultDataDir;
+  std::string dataDir = "data/"; //params::defaultDataDir;
 
   if (argc > 1) {
     dataDir = argv[1];
@@ -63,7 +63,7 @@ int main(int argc, const char *argv[]) {
 
   std::map<std::pair<NumericType, NumericType>, Dimensions<NumericType>>
       dimensionData;
-  CSVWriter<NumericType> dimWriter("P&yValidation.csv");
+  CSVWriter<NumericType> dimWriter("P&yTest.csv");
   int counter = 0;
   for (auto dirItem : std::filesystem::directory_iterator(dataDir)) {
 
