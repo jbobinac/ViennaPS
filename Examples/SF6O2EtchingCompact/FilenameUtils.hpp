@@ -4,7 +4,7 @@
 #include <string>
 #include <utility>
 
-std::tuple<std::string, std::string>
+std::pair<std::string, std::string>
 //std::string
 extractParameters(const std::string &filename,
                   const std::string &regexPattern) {

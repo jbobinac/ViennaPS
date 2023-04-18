@@ -13,30 +13,16 @@
 #include <lsMesh.hpp>
 #include <lsSmartPointer.hpp>
 #include <lsVTKReader.hpp>
+#include <lsVTKWriter.hpp>
 #include "CSVWriter.hpp"
 #include "FilenameUtils.hpp"
 // Auto-generated header which includes data directory path
 #include "/home/bobinac/Documents/ViennaTools/ViennaPS/build/Examples/SF6O2EtchingCompact/parameters.hpp"
 
-#include <queue>
-#include <deque>
-#include <iostream>
-
-template <typename T, int MaxLen, typename Container=std::deque<T>>
-class FixedQueue : public std::queue<T, Container> {
-public:
-    void push(const T& value) {
-        if (this->size() == MaxLen) {
-           this->c.pop_front();
-        }
-        std::queue<T, Container>::push(value);
-    }
-};
-
 
 template <class T> struct Dimensions {
   T depth;
-  T width;
+  std::vector<T> widths;
 };
 
 int main(int argc, const char *argv[]) {
@@ -45,28 +31,28 @@ int main(int argc, const char *argv[]) {
   // set the eps to half the grid delta as a filter to find points at half of max depth
   static constexpr NumericType eps = 2.e-2;
 
-  // Extract from mask height variation study
   // const std::string filenameRegex =
-  //     "\\bHoleEtch_tA_([0-9]+)_m[y|Y]_([0-9]+)_([0-9]+)\\.vtp\\b";
+  //     "\\bHoleEtch_p_([0-9]+)_y_([0-9]+)_V_([0-9]+)_mH_([0-9]+)_([0-9]+)\\.vtp\\b";
+    const std::string filenameRegex =
+      "\\bHoleEtch_p_([0-9]+)_[O|y]_([0-9]+)_100\\.vtp\\b";
 
-  // const std::string filenameRegex =
-  //     "\\bTrenchEtch_y_([0-9]+)_tA_([0-9]+)_mY_0_150\\.vtp\\b";
-
-  const std::string filenameRegex =
-    "\\bHoleEtch_p_([0-9]+)_[O|y]_([0-9]+)_100\\.vtp\\b";
-
-  std::string dataDir = "data/"; //params::defaultDataDir;
+  std::string dataDir = params::defaultDataDir;
 
   if (argc > 1) {
     dataDir = argv[1];
   }
 
-  std::map<std::pair<NumericType, NumericType>, Dimensions<NumericType>>
+  std::map<std::tuple<NumericType, NumericType>, Dimensions<NumericType>> //, NumericType, NumericType, NumericType
       dimensionData;
-  CSVWriter<NumericType> dimWriter("P&yTest.csv");
-  int counter = 0;
-  for (auto dirItem : std::filesystem::directory_iterator(dataDir)) {
+  CSVWriter<NumericType> dimWriter("P&yValidation.csv");
 
+  //dimWriter.writeLine("# P,y,ionEnergy,mH,t,maxDepth,widths");
+  dimWriter.writeLine("# P,y,maxDepth,widths");
+  std::vector<NumericType> sampleDepths{0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.975, 0.99};
+  dimWriter.writePositionalData(sampleDepths);
+  int count =0;
+  for (auto dirItem : std::filesystem::directory_iterator(dataDir)) {
+    //std::cout << count++ << std::endl;
     // Check whether the file is a regular file
     if (!dirItem.is_regular_file())
       continue;
@@ -76,36 +62,30 @@ int main(int argc, const char *argv[]) {
     auto filePath = std::filesystem::path(dirItem);
     auto filename = std::string(filePath.filename());
 
-    // auto [y, tapering, maskHeight] =
+    // auto [pressure, oxygenFraction, ionEnergy, t, maskHeight] =
     //     extractParameters(filename, filenameRegex);
 
-    auto [maskHeight, taperAngle] =
+    auto [pressure, oxygenFraction] =
         extractParameters(filename, filenameRegex);
 
-    // NumericType mY = std::stod(maskHeight) / 100.;
-    // if (mY > 0.5)
-    //   continue;
+    std::cout << pressure << "   " << oxygenFraction << std::endl; //"  " << ionEnergy << "  " << t << "  " << maskHeight << std::endl;
 
-    counter++;
-     
-    //std::cout << tapering << "   " << maskHeight << "   " << timeSteps << std::endl;
-
-    if (maskHeight.empty() || taperAngle.empty()) // || timeSteps.empty()
+  
+    if (pressure.empty() || oxygenFraction.empty())// || ionEnergy.empty() || t.empty() || maskHeight.empty()) 
       continue;
+    NumericType P, y, ionE, T, mH;
+    // Correct the pressure parsing error for 17.5 and 32.5
+    P = std::stod(pressure);
+    // if (P == 32 || P == 17)
+    //   P += 0.5;
+    y = std::stod(oxygenFraction);
+    // ionE = std::stod(ionEnergy);
+    // T = std::stod(t);
+    // mH = std::stod(maskHeight);
+// std::cout << 3 << std::endl;
 
-    // NumericType taper;
-    // // if (tapering.size() == 1)
-    // //     tapering+= '0';
-    // try {
-    //     taper = std::stod(tapering) / 10.;
-    // } catch (std::invalid_argument e) {
-    //   continue;
-    // } catch (std::out_of_range e) {
-    //   continue;
-    // }
+     Dimensions<NumericType> dimensions;
 
-    Dimensions<NumericType> dimensions;
-   
     // Load the mesh file
     auto mesh = lsSmartPointer<lsMesh<>>::New();
     try {
@@ -114,9 +94,6 @@ int main(int argc, const char *argv[]) {
       std::cout << e.what() << std::endl;
       continue;
     }
-
-    // std::cout << filename << "\n- tapering: " << taper
-    //           << std::endl;
 
     const auto &nodes = mesh->getNodes();
 
@@ -137,55 +114,84 @@ int main(int argc, const char *argv[]) {
     // bottom height
     auto maxDepth = *std::min_element(zpos.begin(), zpos.end());
 
-    // std::cout << "- max depth: " << maxDepth << std::endl;
-    // std::cout << "- timeSteps: " << std::stod(timeSteps) << std::endl;
-    // std::cout << "- mH: " << std::stod(maskHeight) << std::endl;
+    //std::cout << "- max depth: " << maxDepth << std::endl;
 
     dimensions.depth = std::fabs(maxDepth);
 
-    // width at 1/2 depth - select points at 1/2 depth +/- gridDelta/2 and take an average radius
-    std::vector<NumericType> radii2;
-
-    // Set up the vector to get 20 largest radii
-    // std::vector<NumericType> maxRadii(10, -1);
-    // std::vector<NumericType> maxRadiiPos(10, 1);
-
-    //NumericType maxRadiusDepth = 1;
-    NumericType maxpos = -1;
-    unsigned count = 0;
-    for (unsigned i = 0; i < zpos.size(); ++i) {
-      const auto &a = xpos[i];
-      const auto &b = ypos[i];
-      const auto &p = zpos[i];
-      NumericType r = a*a + b*b;
-      if (p < (maxDepth / 2) + eps && p > (maxDepth/2 - eps) ) { 
-        radii2.push_back(r);
-        count++;
+    for(int j = 0; j < sampleDepths.size(); ++j){
+      // width at specific percentage of the total depth +/- gridDelta/2 and take an average radius
+      std::vector<NumericType> radii2;
+      NumericType maxpos = -1;
+      unsigned count = 0;
+      for (unsigned i = 0; i < zpos.size(); ++i) {
+        const auto &a = xpos[i];
+        const auto &b = ypos[i];
+        const auto &p = zpos[i];
+        if (p < (maxDepth * sampleDepths[j]) + eps && p > (maxDepth * sampleDepths[j] - eps) ) { 
+          radii2.push_back(a*a + b*b);
+          //count++;
+        }
       }
-      // Find the maximum radius and its location
-      // if (p < 0 && p > maxDepth * 0.6){
-      //   if (r > maxRadii.back()){
-      //     maxRadii.insert(maxRadii.begin(), r);
-      //     maxRadiiPos.insert(maxRadiiPos.begin(), p);
-      //     maxRadii.pop_back();
-      //     maxRadiiPos.pop_back();
-      //   }
-      // }
+      dimensions.widths.push_back(std::sqrt(std::accumulate(radii2.begin(), radii2.end(), 0.0) / radii2.size()));
     }
-    dimensions.width = std::sqrt(std::accumulate(radii2.begin(), radii2.end(), 0.0) / radii2.size());
-  
-    // NumericType maxRadius = std::sqrt(std::accumulate(maxRadii.begin(), maxRadii.end(), 0.0) / maxRadii.size());
-    // NumericType maxRadiusRelPos = std::accumulate(maxRadiiPos.begin(), maxRadiiPos.end(), 0.0) / maxRadiiPos.size();
-    // maxRadiusRelPos = std::fabs(maxRadiusRelPos);// / dimensions.depth;
 
-    // dimensionData[std::pair{params.spacerWidth - 2 * iso, sticking}] =
-    //     dimensions;
-    // dimWriter.writeRow(
-    //     std::vector<NumericType>{ std::stod(maskHeight) /100., std::stod(taperAngle), maxRadius, maxRadiusRelPos, dimensions.depth});
-    
-    dimWriter.writeRow(
-        std::vector<NumericType>{ std::stod(taperAngle) /10., std::stod(maskHeight), dimensions.depth, dimensions.width});
-         // taper,   std::stod(maskHeight) / 100., dimensions.width
-  }
-  std::cout << counter << std::endl;
+     dimensionData[std::tuple{y, P}] = //, ionE, T, mH
+         dimensions;
+//std::cout << 4 << std::endl;
+    std::vector<NumericType> temp = {P, y, dimensions.depth}; //, ionE, T, mH
+    for (auto i: dimensions.widths){
+      temp.push_back(i);
+    }
+    //if(y == 58 || y== 53 || y == 60)
+      dimWriter.writeRow(temp);
+     count++;
+   }
+  std::cout << "Count is  " << count << std::endl;
 }
+
+
+// // Now store the extracted data in a Mesh
+//   auto dataMesh = lsSmartPointer<lsMesh<>>::New();
+
+//   std::set<NumericType> pressures;
+//   std::set<NumericType> oxygenFractions;
+
+//   std::vector<NumericType> depths;
+//   std::vector<std::vector<NumericType>> widthData(sampleDepths.size());
+
+//   for (const auto &[k, v] : dimensionData) {
+//     depths.push_back(v.depth);
+//     for (int w = 0; w < v.widths.size(); ++w){
+//       widthData[w].push_back(v.widths.at(w));
+//     }
+//     dataMesh->insertNextNode(std::array<NumericType, 3>{k.first, k.second, 0.});
+//     oxygenFractions.insert(k.first);
+//     pressures.insert(k.second);
+//   }
+
+//   unsigned nYs = oxygenFractions.size();
+//   unsigned nPressures = pressures.size();
+//   for (unsigned j = 0; j < nYs - 1; ++j)
+//     for (unsigned i = 0; i < nPressures - 1; ++i) {
+//       unsigned index = j * nPressures + i;
+//       dataMesh->insertNextTetra(std::array<unsigned, 4>{
+//           index, index + nPressures, index + nPressures + 1, index + 1});
+//     }
+
+//   dataMesh->getPointData().insertNextScalarData(depths,
+//                                                 "depths");     
+//   dataMesh->getPointData().insertNextScalarData(widthData[0], "widths005");                                                                                      
+//   dataMesh->getPointData().insertNextScalarData(widthData[1], "widths005");
+//   dataMesh->getPointData().insertNextScalarData(widthData[2], "widths01");
+//   dataMesh->getPointData().insertNextScalarData(widthData[3], "widths02");
+//   dataMesh->getPointData().insertNextScalarData(widthData[4], "widths03");
+//   dataMesh->getPointData().insertNextScalarData(widthData[5], "widths04");
+//   dataMesh->getPointData().insertNextScalarData(widthData[6], "widths05");
+//   dataMesh->getPointData().insertNextScalarData(widthData[7], "widths06");
+//   dataMesh->getPointData().insertNextScalarData(widthData[8], "widths07");
+//   dataMesh->getPointData().insertNextScalarData(widthData[9], "widths08");
+//   dataMesh->getPointData().insertNextScalarData(widthData[10], "widths09");
+//   dataMesh->getPointData().insertNextScalarData(widthData[11], "widths095");
+
+//   lsVTKWriter<NumericType>(dataMesh, "dataMesh.vtu").apply();
+//}

@@ -33,6 +33,16 @@ public:
 
   void writeLine(const std::string &line) { file << line << "\n"; }
 
+  void writePositionalData(const std::vector<NumericType> &data) {
+    file << "#! " << join(data.cbegin(), data.cend()) << "\n";
+  }
+
+  void writePositionalData(lsSmartPointer<std::vector<NumericType>> data) {
+    if (data == nullptr)
+      return;
+    file << "#!" << join(data->cbegin(), data->cend()) << "\n";
+  }
+
   ~CSVWriter() { file.close(); }
 };
 #endif
